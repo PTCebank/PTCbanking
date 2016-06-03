@@ -1,0 +1,48 @@
+from django.shortcuts import render
+from django.http import HttpResponseRedirect
+from models import CreateAccount
+import models
+from random import randint
+import datetime, random, sha
+from forms import CreateAccountForm
+
+def sign_up(request):
+    if request.method == 'POST' and request.POST.get('password') == request.POST.get('rePassword'):
+        form = CreateAccountForm(request.POST)
+        if form.is_valid():
+            m = form.save()
+            try:
+                m.save()
+            except:
+                m = CreateAccount()
+                return render(request, 'Sign_up.html', {'form': m})  # There will be a validation error on this page
+            dateOpened = datetime.datetime.now()
+            date = datetime.datetime.now() + datetime.timedelta(1)
+            status = 'Activation Required'
+            n =False
+            while n == False:
+                try:
+                    accNum = randint(1000000000, 9999999999)
+                    m.accNum = accNum
+                    m.save()
+                    n = True
+                except:
+                    pass
+            m.accNick = str(accNum)
+            m.dateOpened = dateOpened
+            m.status = status
+            m.date = date
+            salt = sha.new(str(random.random())).hexdigest()[:5]
+            activation_key = sha.new(salt + str(m.userName)).hexdigest()
+            key_expires = date
+            mailer = Mail.objects.create(user=m.userName,email=m.email,activation_key=activation_key,date=key_expires)
+            mailer.save()
+            models.mail_activation(m.userName, m.email, activation_key)
+            m.save()
+            return HttpResponseRedirect ('/Success1')
+        else:
+            m = CreateAccount()
+            return render(request, 'Sign_up.html', {'form': m}) #There will be a validation error on this page
+    else:
+        m = CreateAccount()
+        return render(request, 'Sign_up.html', {'form': m})
